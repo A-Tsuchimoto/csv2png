@@ -192,50 +192,75 @@ function getFontSize(tableW, tableH, rowCount, colCount) {
   return Math.max(10, Math.min(60, Math.min(fromWidth, fromHeight)));
 }
 
+function tokenizeText(text) {
+  if (!text) return [];
+
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    const segmenter = new Intl.Segmenter('ja', { granularity: 'word' });
+    return Array.from(segmenter.segment(text), ({ segment }) => segment);
+  }
+
+  return Array.from(text);
+}
+
+function breakLongToken(ctx, token, maxWidth) {
+  const broken = [];
+  let rest = token;
+
+  while (rest.length) {
+    let i = 1;
+    while (i <= rest.length && ctx.measureText(rest.slice(0, i)).width <= maxWidth) i += 1;
+    const cut = Math.max(1, i - 1);
+    broken.push(rest.slice(0, cut));
+    rest = rest.slice(cut);
+  }
+
+  return broken;
+}
+
 function wrapText(ctx, text, maxWidth) {
   if (!text) return [''];
 
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (!normalized) return [''];
-
-  if (ctx.measureText(normalized).width <= maxWidth) return [normalized];
-
-  const chunks = normalized.split(' ');
   const lines = [];
-  let line = '';
+  const paragraphs = String(text).replace(/\r\n?/g, '\n').split('\n');
 
-  const pushBrokenWord = (word) => {
-    let rest = word;
-    while (rest.length) {
-      let i = 1;
-      while (i <= rest.length && ctx.measureText(rest.slice(0, i)).width <= maxWidth) i += 1;
-      const cut = Math.max(1, i - 1);
-      lines.push(rest.slice(0, cut));
-      rest = rest.slice(cut);
-    }
-  };
-
-  chunks.forEach((word) => {
-    const candidate = line ? `${line} ${word}` : word;
-    if (ctx.measureText(candidate).width <= maxWidth) {
-      line = candidate;
-      return;
+  for (const paragraph of paragraphs) {
+    if (!paragraph) {
+      lines.push('');
+      continue;
     }
 
-    if (line) {
-      lines.push(line);
-      line = '';
+    if (ctx.measureText(paragraph).width <= maxWidth) {
+      lines.push(paragraph);
+      continue;
     }
 
-    if (ctx.measureText(word).width <= maxWidth) {
-      line = word;
-      return;
+    const tokens = tokenizeText(paragraph);
+    let line = '';
+
+    for (const token of tokens) {
+      const candidate = `${line}${token}`;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        line = candidate;
+        continue;
+      }
+
+      if (line) {
+        lines.push(line);
+        line = '';
+      }
+
+      if (ctx.measureText(token).width <= maxWidth) {
+        line = token;
+        continue;
+      }
+
+      lines.push(...breakLongToken(ctx, token, maxWidth));
     }
 
-    pushBrokenWord(word);
-  });
+    if (line) lines.push(line);
+  }
 
-  if (line) lines.push(line);
   return lines.length ? lines : [''];
 }
 
@@ -266,7 +291,7 @@ function estimateColumnMinWidths(ctx, rows, paddingX) {
       const text = (rows[r][c] ?? '').replace(/\s+/g, ' ').trim();
       if (!text) continue;
 
-      const tokens = text.split(' ');
+      const tokens = tokenizeText(text).filter((token) => token.trim());
       for (const token of tokens) {
         longestTokenWidth = Math.max(longestTokenWidth, ctx.measureText(token).width);
       }
