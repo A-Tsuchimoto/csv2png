@@ -265,6 +265,23 @@ function parseMarkdownStrong(text) {
   });
 }
 
+function createTextMeasureCache(ctx, fontSize, fontFamily) {
+  const cache = new Map();
+  const fonts = {
+    strong: `600 ${fontSize}px ${fontFamily}`,
+    normal: `400 ${fontSize}px ${fontFamily}`,
+  };
+
+  return (text, strong) => {
+    const key = `${strong ? '1' : '0'}|${text}`;
+    if (cache.has(key)) return cache.get(key);
+    ctx.font = strong ? fonts.strong : fonts.normal;
+    const width = ctx.measureText(text).width;
+    cache.set(key, width);
+    return width;
+  };
+}
+
 function getCellDisplayValue(raw, format) {
   if (format !== INPUT_FORMATS.markdown) {
     return {
@@ -280,18 +297,13 @@ function getCellDisplayValue(raw, format) {
   };
 }
 
-function measureStyledText(ctx, text, strong, fontSize) {
-  ctx.font = `${strong ? '600' : '400'} ${fontSize}px ${els.fontFamily.value}`;
-  return ctx.measureText(text).width;
-}
-
-function breakLongStyledToken(ctx, token, maxWidth, fontSize) {
+function breakLongStyledToken(token, maxWidth, measureWidth) {
   const chunks = [];
   let rest = token.text;
 
   while (rest.length) {
     let i = 1;
-    while (i <= rest.length && measureStyledText(ctx, rest.slice(0, i), token.strong, fontSize) <= maxWidth) i += 1;
+    while (i <= rest.length && measureWidth(rest.slice(0, i), token.strong) <= maxWidth) i += 1;
     const cut = Math.max(1, i - 1);
     chunks.push({ text: rest.slice(0, cut), strong: token.strong });
     rest = rest.slice(cut);
@@ -300,55 +312,68 @@ function breakLongStyledToken(ctx, token, maxWidth, fontSize) {
   return chunks;
 }
 
-function wrapStyledText(ctx, segments, maxWidth, fontSize) {
+function wrapStyledText(segments, maxWidth, measureWidth, getTokens) {
   const lines = [];
+  const lineWidths = [];
   const src = segments.length ? segments : [{ text: '', strong: false }];
 
-  src.forEach((segment, segIdx) => {
+  src.forEach((segment) => {
     const paragraphs = String(segment.text).replace(/\r\n?/g, '\n').split('\n');
 
     paragraphs.forEach((paragraph, pIdx) => {
-      if (!lines.length) lines.push([]);
+      if (!lines.length) {
+        lines.push([]);
+        lineWidths.push(0);
+      }
 
-      const tokens = tokenizeText(paragraph).map((token) => ({ text: token, strong: !!segment.strong }));
+      const tokens = getTokens(paragraph).map((token) => ({ text: token, strong: !!segment.strong }));
       if (!tokens.length) {
-        if (pIdx < paragraphs.length - 1) lines.push([]);
+        if (pIdx < paragraphs.length - 1) {
+          lines.push([]);
+          lineWidths.push(0);
+        }
         return;
       }
 
       for (const token of tokens) {
-        let current = lines[lines.length - 1];
-        const currentWidth = current.reduce(
-          (sum, part) => sum + measureStyledText(ctx, part.text, part.strong, fontSize),
-          0
-        );
-        const tokenWidth = measureStyledText(ctx, token.text, token.strong, fontSize);
+        const lineIdx = lines.length - 1;
+        let current = lines[lineIdx];
+        let currentWidth = lineWidths[lineIdx];
+        const tokenWidth = measureWidth(token.text, token.strong);
 
         if (!current.length || currentWidth + tokenWidth <= maxWidth) {
           current.push(token);
+          lineWidths[lineIdx] += tokenWidth;
           continue;
         }
 
         if (tokenWidth <= maxWidth) {
           lines.push([token]);
+          lineWidths.push(tokenWidth);
           continue;
         }
 
-        const chunks = breakLongStyledToken(ctx, token, maxWidth, fontSize);
+        const chunks = breakLongStyledToken(token, maxWidth, measureWidth);
         for (const chunk of chunks) {
-          current = lines[lines.length - 1];
-          const width = current.reduce(
-            (sum, part) => sum + measureStyledText(ctx, part.text, part.strong, fontSize),
-            0
-          );
-          const chunkWidth = measureStyledText(ctx, chunk.text, chunk.strong, fontSize);
+          const currentIdx = lines.length - 1;
+          current = lines[currentIdx];
+          currentWidth = lineWidths[currentIdx];
+          const chunkWidth = measureWidth(chunk.text, chunk.strong);
 
-          if (!current.length || width + chunkWidth <= maxWidth) current.push(chunk);
-          else lines.push([chunk]);
+          if (!current.length || currentWidth + chunkWidth <= maxWidth) {
+            current.push(chunk);
+            lineWidths[currentIdx] += chunkWidth;
+          } else {
+            lines.push([chunk]);
+            lineWidths.push(chunkWidth);
+          }
         }
       }
 
-      if (pIdx < paragraphs.length - 1) lines.push([]);
+      if (pIdx < paragraphs.length - 1) {
+        lines.push([]);
+        lineWidths.push(0);
+      }
     });
   });
 
@@ -405,8 +430,10 @@ function tokenizeText(text) {
   if (!text) return [];
 
   if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
-    const segmenter = new Intl.Segmenter('ja', { granularity: 'word' });
-    return Array.from(segmenter.segment(text), ({ segment }) => segment);
+    if (!tokenizeText.segmenter) {
+      tokenizeText.segmenter = new Intl.Segmenter('ja', { granularity: 'word' });
+    }
+    return Array.from(tokenizeText.segmenter.segment(text), ({ segment }) => segment);
   }
 
   return Array.from(text);
@@ -595,11 +622,21 @@ function render() {
   let colWidths = [];
   let wrappedCells = [];
   let rowHeights = [];
+  let measureWidth = () => 0;
+  const tokenCache = new Map();
+  const getTokens = (text) => {
+    const key = String(text ?? '');
+    if (tokenCache.has(key)) return tokenCache.get(key);
+    const tokens = tokenizeText(key);
+    tokenCache.set(key, tokens);
+    return tokens;
+  };
 
   do {
     lineHeight = Math.round(fontSize * 1.35);
     paddingX = Math.max(10, Math.round(fontSize * 0.65));
     paddingY = Math.max(8, Math.round(fontSize * 0.4));
+    measureWidth = createTextMeasureCache(ctx, fontSize, els.fontFamily.value);
     colWidths = calculateColumnWidths(tableW, rows, ctx, paddingX);
 
     wrappedCells = rows.map((row, r) =>
@@ -611,7 +648,7 @@ function render() {
         return {
           lines:
             format === INPUT_FORMATS.markdown
-              ? wrapStyledText(ctx, segments, Math.max(24, colWidths[c] - paddingX * 2), fontSize)
+              ? wrapStyledText(segments, Math.max(24, colWidths[c] - paddingX * 2), measureWidth, getTokens)
               : wrapText(ctx, text, Math.max(24, colWidths[c] - paddingX * 2)).map((line) => [
                   { text: line, strong: false },
                 ]),
@@ -671,7 +708,7 @@ function render() {
 
       lines.forEach((lineParts) => {
         const textWidth = lineParts.reduce(
-          (sum, part) => sum + measureStyledText(ctx, part.text, isHeader || part.strong, fontSize),
+          (sum, part) => sum + measureWidth(part.text, isHeader || part.strong),
           0
         );
         const drawX = getAlignedX(x, cellW, paddingX, textWidth, align);
