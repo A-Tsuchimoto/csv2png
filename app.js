@@ -258,14 +258,92 @@ function parseMarkdownStrong(text) {
 
 function getCellDisplayValue(raw, format) {
   if (format !== INPUT_FORMATS.markdown) {
-    return { text: raw ?? '', hasStrong: false };
+    return {
+      text: raw ?? '',
+      segments: [{ text: raw ?? '', strong: false }],
+    };
   }
 
   const segments = parseMarkdownStrong(raw);
   return {
     text: segments.map((segment) => segment.text).join(''),
-    hasStrong: segments.some((segment) => segment.strong),
+    segments,
   };
+}
+
+function measureStyledText(ctx, text, strong, fontSize) {
+  ctx.font = `${strong ? '600' : '400'} ${fontSize}px ${els.fontFamily.value}`;
+  return ctx.measureText(text).width;
+}
+
+function breakLongStyledToken(ctx, token, maxWidth, fontSize) {
+  const chunks = [];
+  let rest = token.text;
+
+  while (rest.length) {
+    let i = 1;
+    while (i <= rest.length && measureStyledText(ctx, rest.slice(0, i), token.strong, fontSize) <= maxWidth) i += 1;
+    const cut = Math.max(1, i - 1);
+    chunks.push({ text: rest.slice(0, cut), strong: token.strong });
+    rest = rest.slice(cut);
+  }
+
+  return chunks;
+}
+
+function wrapStyledText(ctx, segments, maxWidth, fontSize) {
+  const lines = [];
+  const src = segments.length ? segments : [{ text: '', strong: false }];
+
+  src.forEach((segment, segIdx) => {
+    const paragraphs = String(segment.text).replace(/\r\n?/g, '\n').split('\n');
+
+    paragraphs.forEach((paragraph, pIdx) => {
+      if (!lines.length) lines.push([]);
+
+      const tokens = tokenizeText(paragraph).map((token) => ({ text: token, strong: !!segment.strong }));
+      if (!tokens.length) {
+        if (pIdx < paragraphs.length - 1 || segIdx < src.length - 1) lines.push([]);
+        return;
+      }
+
+      for (const token of tokens) {
+        let current = lines[lines.length - 1];
+        const currentWidth = current.reduce(
+          (sum, part) => sum + measureStyledText(ctx, part.text, part.strong, fontSize),
+          0
+        );
+        const tokenWidth = measureStyledText(ctx, token.text, token.strong, fontSize);
+
+        if (!current.length || currentWidth + tokenWidth <= maxWidth) {
+          current.push(token);
+          continue;
+        }
+
+        if (tokenWidth <= maxWidth) {
+          lines.push([token]);
+          continue;
+        }
+
+        const chunks = breakLongStyledToken(ctx, token, maxWidth, fontSize);
+        for (const chunk of chunks) {
+          current = lines[lines.length - 1];
+          const width = current.reduce(
+            (sum, part) => sum + measureStyledText(ctx, part.text, part.strong, fontSize),
+            0
+          );
+          const chunkWidth = measureStyledText(ctx, chunk.text, chunk.strong, fontSize);
+
+          if (!current.length || width + chunkWidth <= maxWidth) current.push(chunk);
+          else lines.push([chunk]);
+        }
+      }
+
+      if (pIdx < paragraphs.length - 1 || segIdx < src.length - 1) lines.push([]);
+    });
+  });
+
+  return lines.length ? lines : [[]];
 }
 
 function setFormatMode(mode) {
@@ -517,13 +595,17 @@ function render() {
 
     wrappedCells = rows.map((row, r) =>
       row.map((raw, c) => {
-        const { text, hasStrong } = getCellDisplayValue(raw, format);
+        const { text, segments } = getCellDisplayValue(raw, format);
         const isHeader = (hasHeaderRow && r === 0) || (hasHeaderCol && c === 0);
-        const weight = isHeader || hasStrong ? '600' : '400';
+        const weight = isHeader ? '600' : '400';
         ctx.font = `${weight} ${fontSize}px ${els.fontFamily.value}`;
         return {
-          lines: wrapText(ctx, text, Math.max(24, colWidths[c] - paddingX * 2)),
-          hasStrong,
+          lines:
+            format === INPUT_FORMATS.markdown
+              ? wrapStyledText(ctx, segments, Math.max(24, colWidths[c] - paddingX * 2), fontSize)
+              : wrapText(ctx, text, Math.max(24, colWidths[c] - paddingX * 2)).map((line) => [
+                  { text: line, strong: false },
+                ]),
         };
       })
     );
@@ -573,17 +655,26 @@ function render() {
       const lines = cellText.lines;
       const align = isHeader ? els.headerAlign.value : els.bodyAlign.value;
       ctx.fillStyle = isHeader ? theme.headerText : theme.text;
-      const weight = isHeader || cellText.hasStrong ? '600' : '400';
-      ctx.font = `${weight} ${fontSize}px ${els.fontFamily.value}`;
 
       const lineCount = lines.length;
       const textBlockH = lineCount * lineHeight;
       let textY = y + (rowH - textBlockH) / 2 + fontSize;
 
-      lines.forEach((line) => {
-        const textWidth = ctx.measureText(line).width;
+      lines.forEach((lineParts) => {
+        const textWidth = lineParts.reduce(
+          (sum, part) => sum + measureStyledText(ctx, part.text, isHeader || part.strong, fontSize),
+          0
+        );
         const drawX = getAlignedX(x, cellW, paddingX, textWidth, align);
-        ctx.fillText(line, drawX, textY);
+        let cursorX = drawX;
+
+        lineParts.forEach((part) => {
+          const strong = isHeader || part.strong;
+          ctx.font = `${strong ? '600' : '400'} ${fontSize}px ${els.fontFamily.value}`;
+          ctx.fillText(part.text, cursorX, textY);
+          cursorX += ctx.measureText(part.text).width;
+        });
+
         textY += lineHeight;
       });
 
