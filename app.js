@@ -106,6 +106,7 @@ const els = {
   dpi: document.getElementById('dpi'),
   fontFamily: document.getElementById('fontFamily'),
   fontSize: document.getElementById('fontSize'),
+  currentFontSize: document.getElementById('currentFontSize'),
   hasHeaderRow: document.getElementById('hasHeaderRow'),
   hasHeaderCol: document.getElementById('hasHeaderCol'),
   headerAlign: document.getElementById('headerAlign'),
@@ -189,7 +190,12 @@ function getFontSize(tableW, tableH, rowCount, colCount) {
   const perCellH = tableH / Math.max(1, rowCount);
   const fromWidth = Math.round(perCellW / 8.5);
   const fromHeight = Math.round(perCellH * 0.38);
-  return Math.max(10, Math.min(60, Math.min(fromWidth, fromHeight)));
+  return Math.max(10, Math.min(120, Math.min(fromWidth, fromHeight)));
+}
+
+function updateCurrentFontSizeLabel(fontSize) {
+  const modeLabel = els.fontSize.value === 'auto' ? '自動算出' : '固定';
+  els.currentFontSize.textContent = `${fontSize}px (${modeLabel})`;
 }
 
 function tokenizeText(text) {
@@ -463,6 +469,8 @@ function render() {
 
     y += rowH;
   }
+
+  updateCurrentFontSizeLabel(fontSize);
 
   if (style.outerFrame) {
     ctx.lineWidth = 2;
