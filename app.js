@@ -105,8 +105,11 @@ const els = {
   aspectRatio: document.getElementById('aspectRatio'),
   dpi: document.getElementById('dpi'),
   fontFamily: document.getElementById('fontFamily'),
+  fontSize: document.getElementById('fontSize'),
   hasHeaderRow: document.getElementById('hasHeaderRow'),
   hasHeaderCol: document.getElementById('hasHeaderCol'),
+  headerAlign: document.getElementById('headerAlign'),
+  bodyAlign: document.getElementById('bodyAlign'),
   tableStyle: document.getElementById('tableStyle'),
   colorTheme: document.getElementById('colorTheme'),
   renderBtn: document.getElementById('renderBtn'),
@@ -170,21 +173,116 @@ function readRatio() {
 }
 
 function calcCanvasSize() {
-  const dpi = Number(els.dpi.value) || 180;
+  const dpi = Number(els.dpi.value) || 360;
   const ratio = readRatio();
-  const baseWidthAt180 = 1920;
-  const width = Math.max(640, Math.round((baseWidthAt180 * dpi) / 180));
+  const baseWidthAt360 = 1920;
+  const width = Math.max(640, Math.round((baseWidthAt360 * dpi) / 360));
   const height = Math.max(360, Math.round(width / ratio));
   return { width, height };
 }
 
-function fitText(ctx, text, maxWidth) {
-  if (ctx.measureText(text).width <= maxWidth) return text;
-  let out = text;
-  while (out.length > 1 && ctx.measureText(`${out}…`).width > maxWidth) {
-    out = out.slice(0, -1);
+function getFontSize(tableW, tableH, rowCount, colCount) {
+  const value = els.fontSize.value;
+  if (value !== 'auto') return Number(value);
+
+  const perCellW = tableW / Math.max(1, colCount);
+  const perCellH = tableH / Math.max(1, rowCount);
+  const fromWidth = Math.round(perCellW / 8.5);
+  const fromHeight = Math.round(perCellH * 0.38);
+  return Math.max(10, Math.min(60, Math.min(fromWidth, fromHeight)));
+}
+
+function wrapText(ctx, text, maxWidth) {
+  if (!text) return [''];
+  const chunks = text.split(/\s+/).filter(Boolean);
+  if (!chunks.length) return [''];
+
+  const lines = [];
+  let line = '';
+
+  const pushBrokenWord = (word) => {
+    let rest = word;
+    while (rest.length) {
+      let i = 1;
+      while (i <= rest.length && ctx.measureText(rest.slice(0, i)).width <= maxWidth) i += 1;
+      const cut = Math.max(1, i - 1);
+      lines.push(rest.slice(0, cut));
+      rest = rest.slice(cut);
+    }
+  };
+
+  chunks.forEach((word) => {
+    const candidate = line ? `${line} ${word}` : word;
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      line = candidate;
+      return;
+    }
+
+    if (line) {
+      lines.push(line);
+      line = '';
+    }
+
+    if (ctx.measureText(word).width <= maxWidth) {
+      line = word;
+    } else {
+      pushBrokenWord(word);
+    }
+  });
+
+  if (line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+
+function estimateColumnWeights(rows) {
+  const colCount = rows[0].length;
+  const weights = Array(colCount).fill(0);
+
+  for (let c = 0; c < colCount; c += 1) {
+    let total = 0;
+    for (let r = 0; r < rows.length; r += 1) {
+      const len = (rows[r][c] ?? '').replace(/\s+/g, ' ').trim().length;
+      total += Math.max(1, len);
+    }
+    weights[c] = total;
   }
-  return `${out}…`;
+
+  return weights;
+}
+
+function calculateColumnWidths(tableW, rows) {
+  const colCount = rows[0].length;
+  const minColWidth = Math.max(80, tableW * 0.08);
+  const weights = estimateColumnWeights(rows);
+  const totalWeight = weights.reduce((a, b) => a + b, 0) || colCount;
+
+  const raw = weights.map((w) => (tableW * w) / totalWeight);
+  let widths = raw.map((w) => Math.max(minColWidth, w));
+  let sum = widths.reduce((a, b) => a + b, 0);
+
+  if (sum > tableW) {
+    const flexIdx = widths.map((w, idx) => [w, idx]).sort((a, b) => b[0] - a[0]);
+    let overflow = sum - tableW;
+    for (const [, idx] of flexIdx) {
+      if (overflow <= 0) break;
+      const canShrink = widths[idx] - minColWidth;
+      if (canShrink <= 0) continue;
+      const delta = Math.min(canShrink, overflow);
+      widths[idx] -= delta;
+      overflow -= delta;
+    }
+  }
+
+  sum = widths.reduce((a, b) => a + b, 0);
+  const adjust = tableW - sum;
+  widths[colCount - 1] += adjust;
+  return widths;
+}
+
+function getAlignedX(x, cellW, paddingX, textWidth, align) {
+  if (align === 'center') return x + cellW / 2 - textWidth / 2;
+  if (align === 'right') return x + cellW - paddingX - textWidth;
+  return x + paddingX;
 }
 
 function render() {
@@ -225,18 +323,45 @@ function render() {
 
   const rowCount = rows.length;
   const colCount = rows[0].length;
-  const colWidths = Array(colCount).fill(tableW / colCount);
-  const rowH = tableH / rowCount;
+  let fontSize = getFontSize(tableW, tableH, rowCount, colCount);
+  const colWidths = calculateColumnWidths(tableW, rows);
 
-  const fontSize = Math.max(12, Math.round(width / 70));
-  const paddingX = Math.round(fontSize * 0.7);
+  let lineHeight = 0;
+  let paddingX = 0;
+  let paddingY = 0;
+  let wrappedCells = [];
+  let rowHeights = [];
 
-  ctx.textBaseline = 'middle';
-  ctx.font = `${fontSize}px ${els.fontFamily.value}`;
+  do {
+    lineHeight = Math.round(fontSize * 1.35);
+    paddingX = Math.max(10, Math.round(fontSize * 0.65));
+    paddingY = Math.max(8, Math.round(fontSize * 0.4));
+
+    wrappedCells = rows.map((row, r) =>
+      row.map((raw, c) => {
+        const isHeader = (hasHeaderRow && r === 0) || (hasHeaderCol && c === 0);
+        ctx.font = `${isHeader ? '600' : '400'} ${fontSize}px ${els.fontFamily.value}`;
+        return wrapText(ctx, raw ?? '', Math.max(24, colWidths[c] - paddingX * 2));
+      })
+    );
+
+    rowHeights = wrappedCells.map((cells) => {
+      const maxLines = Math.max(...cells.map((lines) => lines.length));
+      return maxLines * lineHeight + paddingY * 2;
+    });
+
+    const contentHeight = rowHeights.reduce((a, b) => a + b, 0);
+    if (contentHeight <= tableH || fontSize <= 8) break;
+    fontSize -= 1;
+  } while (true);
+
+  ctx.textBaseline = 'alphabetic';
 
   let y = tableY;
   for (let r = 0; r < rowCount; r += 1) {
     let x = tableX;
+    const rowH = rowHeights[r];
+
     for (let c = 0; c < colCount; c += 1) {
       const isHeader = (hasHeaderRow && r === 0) || (hasHeaderCol && c === 0);
       let cellBg = theme.bg;
@@ -261,14 +386,25 @@ function render() {
         ctx.strokeRect(x, y, cellW, rowH);
       }
 
-      const raw = rows[r][c] ?? '';
-      const text = fitText(ctx, raw, cellW - paddingX * 2);
+      const lines = wrappedCells[r][c];
+      const align = isHeader ? els.headerAlign.value : els.bodyAlign.value;
       ctx.fillStyle = isHeader ? theme.headerText : theme.text;
       ctx.font = `${isHeader ? '600' : '400'} ${fontSize}px ${els.fontFamily.value}`;
-      ctx.fillText(text, x + paddingX, y + rowH / 2);
+
+      const lineCount = lines.length;
+      const textBlockH = lineCount * lineHeight;
+      let textY = y + (rowH - textBlockH) / 2 + fontSize;
+
+      lines.forEach((line) => {
+        const textWidth = ctx.measureText(line).width;
+        const drawX = getAlignedX(x, cellW, paddingX, textWidth, align);
+        ctx.fillText(line, drawX, textY);
+        textY += lineHeight;
+      });
 
       x += cellW;
     }
+
     y += rowH;
   }
 
@@ -312,5 +448,6 @@ els.downloadBtn.addEventListener('click', downloadPng);
 
 initSelect(els.tableStyle, TABLE_STYLES);
 initSelect(els.colorTheme, COLOR_THEMES);
-els.csvText.value = '項目,値,備考\n売上,1200,前月比 +10%\n利益,320,改善傾向\n顧客満足度,4.4,アンケート結果';
+els.csvText.value =
+  '項目,値,備考\n売上,1200,前月比 +10%\n利益,320,改善傾向\n顧客満足度,4.4,アンケート結果\n長い注記,この列は分量に応じて幅が広がり、必要に応じて折り返して表示されます,見切れ防止';
 render();

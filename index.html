@@ -45,7 +45,7 @@
 
           <label class="field">
             <span>DPI</span>
-            <input id="dpi" type="number" min="72" max="600" value="180" />
+            <input id="dpi" type="number" min="72" max="600" value="360" />
           </label>
 
           <label class="field">
@@ -60,6 +60,40 @@
               <option value="'Times New Roman', serif">Times New Roman</option>
             </select>
           </label>
+
+          <label class="field">
+            <span>フォントサイズ</span>
+            <select id="fontSize">
+              <option value="auto" selected>自動 (デフォルト)</option>
+              <option value="12">12px</option>
+              <option value="14">14px</option>
+              <option value="16">16px</option>
+              <option value="18">18px</option>
+              <option value="20">20px</option>
+              <option value="24">24px</option>
+              <option value="28">28px</option>
+              <option value="32">32px</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>タイトル行/列の揃え</span>
+            <select id="headerAlign">
+              <option value="center" selected>中央揃え (デフォルト)</option>
+              <option value="left">左揃え</option>
+              <option value="right">右揃え</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>本文セルの揃え</span>
+            <select id="bodyAlign">
+              <option value="left" selected>左揃え (デフォルト)</option>
+              <option value="center">中央揃え</option>
+              <option value="right">右揃え</option>
+            </select>
+          </label>
+
 
           <label class="field checkbox">
             <input id="hasHeaderRow" type="checkbox" checked />
