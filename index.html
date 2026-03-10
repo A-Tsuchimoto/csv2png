@@ -14,16 +14,26 @@
       <section class="panel input-panel">
         <h2>1) CSV入力</h2>
         <div class="input-grid">
+          <div class="field full">
+            <span>入力形式</span>
+            <div class="format-controls" role="group" aria-label="入力形式の選択">
+              <button id="formatAutoBtn" class="format-btn active" type="button">自動判定</button>
+              <button id="formatCsvBtn" class="format-btn" type="button">CSV</button>
+              <button id="formatMdBtn" class="format-btn" type="button">Markdown表</button>
+            </div>
+            <small id="formatHint" class="format-hint">現在: 自動判定</small>
+          </div>
+
           <label class="field">
-            <span>CSVファイル</span>
-            <input id="csvFile" type="file" accept=".csv,text/csv" />
+            <span>CSV / Markdownファイル</span>
+            <input id="csvFile" type="file" accept=".csv,.md,.txt,text/csv,text/markdown,text/plain" />
           </label>
           <label class="field full">
-            <span>CSVテキスト</span>
+            <span>CSV / Markdownテキスト</span>
             <textarea
               id="csvText"
               rows="10"
-              placeholder="例:\n項目,値,メモ\nA,100,テスト\nB,200,サンプル"
+              placeholder="CSV例:\n項目,値,メモ\nA,100,テスト\n\nMarkdown表例:\n| 項目 | 値 | メモ |\n| --- | ---: | --- |\n| A | 100 | テスト |"
             ></textarea>
           </label>
         </div>
@@ -79,6 +89,13 @@
               <option value="56">56px</option>
               <option value="64">64px</option>
               <option value="72">72px</option>
+              <option value="84">84px</option>
+              <option value="96">96px</option>
+              <option value="108">108px</option>
+              <option value="120">120px</option>
+              <option value="132">132px</option>
+              <option value="144">144px</option>
+              <option value="156">156px</option>
             </select>
           </label>
 

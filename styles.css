@@ -121,3 +121,24 @@ button:last-child {
   align-items: center;
   font-weight: 600;
 }
+
+
+.format-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.format-btn {
+  background: #dbe7f6;
+  color: #1f2a36;
+}
+
+.format-btn.active {
+  background: #1f6feb;
+  color: #fff;
+}
+
+.format-hint {
+  color: #4b5563;
+}

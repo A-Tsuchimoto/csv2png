@@ -5,7 +5,7 @@ const TABLE_STYLES = {
     stripe: false,
     roundedCells: false,
     shadow: false,
-    outerFrame: true,
+    outerFrame: false,
   },
   simpleStriped: {
     label: 'シンプル2: ストライプ',
@@ -13,7 +13,7 @@ const TABLE_STYLES = {
     stripe: true,
     roundedCells: false,
     shadow: false,
-    outerFrame: true,
+    outerFrame: false,
   },
   simpleDense: {
     label: 'シンプル3: 高密度',
@@ -37,9 +37,17 @@ const TABLE_STYLES = {
     stripe: false,
     roundedCells: true,
     shadow: true,
-    outerFrame: true,
+    outerFrame: false,
   },
 };
+
+const INPUT_FORMATS = {
+  auto: 'auto',
+  csv: 'csv',
+  markdown: 'markdown',
+};
+
+let selectedInputFormat = INPUT_FORMATS.auto;
 
 const COLOR_THEMES = {
   grayMist: {
@@ -101,6 +109,10 @@ const COLOR_THEMES = {
 
 const els = {
   csvFile: document.getElementById('csvFile'),
+  formatAutoBtn: document.getElementById('formatAutoBtn'),
+  formatCsvBtn: document.getElementById('formatCsvBtn'),
+  formatMdBtn: document.getElementById('formatMdBtn'),
+  formatHint: document.getElementById('formatHint'),
   csvText: document.getElementById('csvText'),
   aspectRatio: document.getElementById('aspectRatio'),
   dpi: document.getElementById('dpi'),
@@ -128,7 +140,13 @@ function initSelect(select, source) {
   });
 }
 
-function parseCsv(text) {
+function normalizeRows(rows) {
+  if (!rows.length) return [];
+  const maxCols = rows.reduce((max, r) => Math.max(max, r.length), 0);
+  return rows.map((r) => [...r, ...Array(maxCols - r.length).fill('')]);
+}
+
+function parseDelimited(text, delimiter) {
   const rows = [];
   let row = [];
   let value = '';
@@ -145,7 +163,7 @@ function parseCsv(text) {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (ch === ',' && !inQuotes) {
+    } else if (ch === delimiter && !inQuotes) {
       row.push(value.trim());
       value = '';
     } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
@@ -164,8 +182,79 @@ function parseCsv(text) {
     if (row.some((cell) => cell !== '')) rows.push(row);
   }
 
-  const maxCols = rows.reduce((max, r) => Math.max(max, r.length), 0);
-  return rows.map((r) => [...r, ...Array(maxCols - r.length).fill('')]);
+  return normalizeRows(rows);
+}
+
+function parseCsv(text) {
+  return parseDelimited(text, ',');
+}
+
+function isMarkdownSeparatorRow(cells) {
+  if (!cells.length) return false;
+  return cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')));
+}
+
+function parseMarkdownTable(text) {
+  const lines = String(text).replace(/\r\n?/g, '\n').split('\n');
+  const tableLines = lines.filter((line) => line.includes('|') && line.trim() !== '');
+
+  const parsedRows = tableLines
+    .map((line) => {
+      let row = line.trim();
+      if (row.startsWith('|')) row = row.slice(1);
+      if (row.endsWith('|')) row = row.slice(0, -1);
+      return row.split('|').map((cell) => cell.trim());
+    })
+    .filter((cells) => cells.some((cell) => cell !== ''));
+
+  if (parsedRows.length >= 2 && isMarkdownSeparatorRow(parsedRows[1])) {
+    parsedRows.splice(1, 1);
+  }
+
+  return normalizeRows(parsedRows);
+}
+
+function detectInputFormat(text) {
+  const normalized = String(text || '').trim();
+  if (!normalized) return INPUT_FORMATS.csv;
+
+  const lines = normalized.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const pipeLines = lines.filter((line) => line.includes('|'));
+
+  if (pipeLines.length >= 2) {
+    const second = pipeLines[1] || '';
+    if (second.replace(/\s+/g, '').match(/^\|?:?-{3,}:?(\|:?-{3,}:?)+\|?$/)) return INPUT_FORMATS.markdown;
+    if (pipeLines.every((line) => line.includes('|'))) return INPUT_FORMATS.markdown;
+  }
+
+  return INPUT_FORMATS.csv;
+}
+
+function getActiveInputFormat(text) {
+  if (selectedInputFormat !== INPUT_FORMATS.auto) return selectedInputFormat;
+  return detectInputFormat(text);
+}
+
+function parseByFormat(text) {
+  const format = getActiveInputFormat(text);
+  const rows = format === INPUT_FORMATS.markdown ? parseMarkdownTable(text) : parseCsv(text);
+  return { rows, format };
+}
+
+function setFormatMode(mode) {
+  selectedInputFormat = mode;
+  const activeFromText = getActiveInputFormat(els.csvText.value);
+
+  els.formatAutoBtn.classList.toggle('active', mode === INPUT_FORMATS.auto);
+  els.formatCsvBtn.classList.toggle('active', mode === INPUT_FORMATS.csv);
+  els.formatMdBtn.classList.toggle('active', mode === INPUT_FORMATS.markdown);
+
+  const labelMap = {
+    [INPUT_FORMATS.auto]: `現在: 自動判定 (${activeFromText === INPUT_FORMATS.markdown ? 'Markdown表' : 'CSV'})`,
+    [INPUT_FORMATS.csv]: '現在: CSV (手動指定)',
+    [INPUT_FORMATS.markdown]: '現在: Markdown表 (手動指定)',
+  };
+  els.formatHint.textContent = labelMap[mode];
 }
 
 function readRatio() {
@@ -190,7 +279,7 @@ function getFontSize(tableW, tableH, rowCount, colCount) {
   const perCellH = tableH / Math.max(1, rowCount);
   const fromWidth = Math.round(perCellW / 8.5);
   const fromHeight = Math.round(perCellH * 0.38);
-  return Math.max(10, Math.min(120, Math.min(fromWidth, fromHeight)));
+  return Math.max(10, Math.min(156, Math.min(fromWidth, fromHeight)));
 }
 
 function updateCurrentFontSizeLabel(fontSize) {
@@ -348,7 +437,7 @@ function getAlignedX(x, cellW, paddingX, textWidth, align) {
 
 function render() {
   const csvSource = els.csvText.value.trim();
-  const rows = parseCsv(csvSource);
+  const { rows } = parseByFormat(csvSource);
 
   if (!rows.length) {
     alert('CSVデータが空です。');
@@ -504,7 +593,24 @@ els.csvFile.addEventListener('change', async (event) => {
   if (!file) return;
   const text = await file.text();
   els.csvText.value = text;
+  setFormatMode(selectedInputFormat);
   render();
+});
+
+els.formatAutoBtn.addEventListener('click', () => {
+  setFormatMode(INPUT_FORMATS.auto);
+  render();
+});
+els.formatCsvBtn.addEventListener('click', () => {
+  setFormatMode(INPUT_FORMATS.csv);
+  render();
+});
+els.formatMdBtn.addEventListener('click', () => {
+  setFormatMode(INPUT_FORMATS.markdown);
+  render();
+});
+els.csvText.addEventListener('input', () => {
+  if (selectedInputFormat === INPUT_FORMATS.auto) setFormatMode(INPUT_FORMATS.auto);
 });
 
 els.renderBtn.addEventListener('click', render);
@@ -514,4 +620,5 @@ initSelect(els.tableStyle, TABLE_STYLES);
 initSelect(els.colorTheme, COLOR_THEMES);
 els.csvText.value =
   '項目,値,備考\n売上,1200,前月比 +10%\n利益,320,改善傾向\n顧客満足度,4.4,アンケート結果\n長い注記,この列は分量に応じて幅が広がり、必要に応じて折り返して表示されます,見切れ防止';
+setFormatMode(INPUT_FORMATS.auto);
 render();
