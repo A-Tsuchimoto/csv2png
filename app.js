@@ -484,7 +484,7 @@ function render() {
   ctx.fillStyle = theme.bg;
   ctx.fillRect(0, 0, width, height);
 
-  const margin = Math.round(width * 0.05);
+  const margin = Math.round(Math.min(width, height) * 0.025);
   const tableX = margin;
   const tableY = margin;
   const tableW = width - margin * 2;
