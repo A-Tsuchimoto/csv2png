@@ -173,7 +173,7 @@ function readRatio() {
 }
 
 function calcCanvasSize() {
-  const dpi = Number(els.dpi.value) || 360;
+  const dpi = Number(els.dpi.value) || 1200;
   const ratio = readRatio();
   const baseWidthAt360 = 1920;
   const width = Math.max(640, Math.round((baseWidthAt360 * dpi) / 360));
@@ -194,9 +194,13 @@ function getFontSize(tableW, tableH, rowCount, colCount) {
 
 function wrapText(ctx, text, maxWidth) {
   if (!text) return [''];
-  const chunks = text.split(/\s+/).filter(Boolean);
-  if (!chunks.length) return [''];
 
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return [''];
+
+  if (ctx.measureText(normalized).width <= maxWidth) return [normalized];
+
+  const chunks = normalized.split(' ');
   const lines = [];
   let line = '';
 
@@ -225,9 +229,10 @@ function wrapText(ctx, text, maxWidth) {
 
     if (ctx.measureText(word).width <= maxWidth) {
       line = word;
-    } else {
-      pushBrokenWord(word);
+      return;
     }
+
+    pushBrokenWord(word);
   });
 
   if (line) lines.push(line);
@@ -250,14 +255,38 @@ function estimateColumnWeights(rows) {
   return weights;
 }
 
-function calculateColumnWidths(tableW, rows) {
+function estimateColumnMinWidths(ctx, rows, paddingX) {
+  const colCount = rows[0].length;
+  const minWidths = Array(colCount).fill(0);
+
+  for (let c = 0; c < colCount; c += 1) {
+    let longestTokenWidth = 0;
+
+    for (let r = 0; r < rows.length; r += 1) {
+      const text = (rows[r][c] ?? '').replace(/\s+/g, ' ').trim();
+      if (!text) continue;
+
+      const tokens = text.split(' ');
+      for (const token of tokens) {
+        longestTokenWidth = Math.max(longestTokenWidth, ctx.measureText(token).width);
+      }
+    }
+
+    minWidths[c] = Math.max(80, longestTokenWidth + paddingX * 2 + 2);
+  }
+
+  return minWidths;
+}
+
+function calculateColumnWidths(tableW, rows, ctx, paddingX) {
   const colCount = rows[0].length;
   const minColWidth = Math.max(80, tableW * 0.08);
+  const minByToken = estimateColumnMinWidths(ctx, rows, paddingX);
   const weights = estimateColumnWeights(rows);
   const totalWeight = weights.reduce((a, b) => a + b, 0) || colCount;
 
   const raw = weights.map((w) => (tableW * w) / totalWeight);
-  let widths = raw.map((w) => Math.max(minColWidth, w));
+  let widths = raw.map((w, idx) => Math.max(minColWidth, minByToken[idx], w));
   let sum = widths.reduce((a, b) => a + b, 0);
 
   if (sum > tableW) {
@@ -265,7 +294,8 @@ function calculateColumnWidths(tableW, rows) {
     let overflow = sum - tableW;
     for (const [, idx] of flexIdx) {
       if (overflow <= 0) break;
-      const canShrink = widths[idx] - minColWidth;
+      const strictMin = Math.max(minColWidth, minByToken[idx]);
+      const canShrink = widths[idx] - strictMin;
       if (canShrink <= 0) continue;
       const delta = Math.min(canShrink, overflow);
       widths[idx] -= delta;
@@ -324,11 +354,11 @@ function render() {
   const rowCount = rows.length;
   const colCount = rows[0].length;
   let fontSize = getFontSize(tableW, tableH, rowCount, colCount);
-  const colWidths = calculateColumnWidths(tableW, rows);
 
   let lineHeight = 0;
   let paddingX = 0;
   let paddingY = 0;
+  let colWidths = [];
   let wrappedCells = [];
   let rowHeights = [];
 
@@ -336,6 +366,7 @@ function render() {
     lineHeight = Math.round(fontSize * 1.35);
     paddingX = Math.max(10, Math.round(fontSize * 0.65));
     paddingY = Math.max(8, Math.round(fontSize * 0.4));
+    colWidths = calculateColumnWidths(tableW, rows, ctx, paddingX);
 
     wrappedCells = rows.map((row, r) =>
       row.map((raw, c) => {
