@@ -241,6 +241,33 @@ function parseByFormat(text) {
   return { rows, format };
 }
 
+function parseMarkdownStrong(text) {
+  const source = String(text ?? '');
+  const parts = source.split(/(\*\*[^*]+\*\*)/g).filter((part) => part.length > 0);
+
+  if (!parts.length) return [{ text: source, strong: false }];
+
+  return parts.map((part) => {
+    const isStrong = /^\*\*[^*]+\*\*$/.test(part);
+    return {
+      text: isStrong ? part.slice(2, -2) : part,
+      strong: isStrong,
+    };
+  });
+}
+
+function getCellDisplayValue(raw, format) {
+  if (format !== INPUT_FORMATS.markdown) {
+    return { text: raw ?? '', hasStrong: false };
+  }
+
+  const segments = parseMarkdownStrong(raw);
+  return {
+    text: segments.map((segment) => segment.text).join(''),
+    hasStrong: segments.some((segment) => segment.strong),
+  };
+}
+
 function setFormatMode(mode) {
   selectedInputFormat = mode;
   const activeFromText = getActiveInputFormat(els.csvText.value);
@@ -437,7 +464,7 @@ function getAlignedX(x, cellW, paddingX, textWidth, align) {
 
 function render() {
   const csvSource = els.csvText.value.trim();
-  const { rows } = parseByFormat(csvSource);
+  const { rows, format } = parseByFormat(csvSource);
 
   if (!rows.length) {
     alert('CSVデータが空です。');
@@ -490,14 +517,19 @@ function render() {
 
     wrappedCells = rows.map((row, r) =>
       row.map((raw, c) => {
+        const { text, hasStrong } = getCellDisplayValue(raw, format);
         const isHeader = (hasHeaderRow && r === 0) || (hasHeaderCol && c === 0);
-        ctx.font = `${isHeader ? '600' : '400'} ${fontSize}px ${els.fontFamily.value}`;
-        return wrapText(ctx, raw ?? '', Math.max(24, colWidths[c] - paddingX * 2));
+        const weight = isHeader || hasStrong ? '600' : '400';
+        ctx.font = `${weight} ${fontSize}px ${els.fontFamily.value}`;
+        return {
+          lines: wrapText(ctx, text, Math.max(24, colWidths[c] - paddingX * 2)),
+          hasStrong,
+        };
       })
     );
 
     rowHeights = wrappedCells.map((cells) => {
-      const maxLines = Math.max(...cells.map((lines) => lines.length));
+      const maxLines = Math.max(...cells.map((cell) => cell.lines.length));
       return maxLines * lineHeight + paddingY * 2;
     });
 
@@ -537,10 +569,12 @@ function render() {
         ctx.strokeRect(x, y, cellW, rowH);
       }
 
-      const lines = wrappedCells[r][c];
+      const cellText = wrappedCells[r][c];
+      const lines = cellText.lines;
       const align = isHeader ? els.headerAlign.value : els.bodyAlign.value;
       ctx.fillStyle = isHeader ? theme.headerText : theme.text;
-      ctx.font = `${isHeader ? '600' : '400'} ${fontSize}px ${els.fontFamily.value}`;
+      const weight = isHeader || cellText.hasStrong ? '600' : '400';
+      ctx.font = `${weight} ${fontSize}px ${els.fontFamily.value}`;
 
       const lineCount = lines.length;
       const textBlockH = lineCount * lineHeight;
