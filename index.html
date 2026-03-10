@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSV to PNG Table</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>CSV → PNG テーブル変換</h1>
+      <p class="lead">CSVファイルまたは直接入力したCSVテキストを、設定付きでPNG化します。</p>
+
+      <section class="panel input-panel">
+        <h2>1) CSV入力</h2>
+        <div class="input-grid">
+          <label class="field">
+            <span>CSVファイル</span>
+            <input id="csvFile" type="file" accept=".csv,text/csv" />
+          </label>
+          <label class="field full">
+            <span>CSVテキスト</span>
+            <textarea
+              id="csvText"
+              rows="10"
+              placeholder="例:\n項目,値,メモ\nA,100,テスト\nB,200,サンプル"
+            ></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel settings-panel">
+        <h2>2) 出力設定</h2>
+        <div class="settings-grid">
+          <label class="field">
+            <span>アスペクト比</span>
+            <select id="aspectRatio">
+              <option value="16:9" selected>16:9 (デフォルト)</option>
+              <option value="4:3">4:3</option>
+              <option value="1:1">1:1</option>
+              <option value="3:2">3:2</option>
+              <option value="21:9">21:9</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>DPI</span>
+            <input id="dpi" type="number" min="72" max="600" value="180" />
+          </label>
+
+          <label class="field">
+            <span>フォント</span>
+            <select id="fontFamily">
+              <option value="'Noto Sans JP', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif" selected>
+                Noto Sans JP (デフォルト)
+              </option>
+              <option value="'Yu Gothic', 'YuGothic', sans-serif">Yu Gothic</option>
+              <option value="'Meiryo', sans-serif">Meiryo</option>
+              <option value="'Arial', sans-serif">Arial</option>
+              <option value="'Times New Roman', serif">Times New Roman</option>
+            </select>
+          </label>
+
+          <label class="field checkbox">
+            <input id="hasHeaderRow" type="checkbox" checked />
+            <span>タイトル行あり</span>
+          </label>
+
+          <label class="field checkbox">
+            <input id="hasHeaderCol" type="checkbox" />
+            <span>タイトル列あり</span>
+          </label>
+
+          <label class="field">
+            <span>表のデザイン</span>
+            <select id="tableStyle"></select>
+          </label>
+
+          <label class="field">
+            <span>色パターン</span>
+            <select id="colorTheme"></select>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel actions">
+        <button id="renderBtn" type="button">プレビュー更新</button>
+        <button id="downloadBtn" type="button">PNGをダウンロード</button>
+      </section>
+
+      <section class="panel preview">
+        <h2>3) プレビュー</h2>
+        <canvas id="previewCanvas" width="1920" height="1080" aria-label="table preview"></canvas>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
