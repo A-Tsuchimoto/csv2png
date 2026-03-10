@@ -236,9 +236,18 @@ function getActiveInputFormat(text) {
 }
 
 function parseByFormat(text) {
-  const format = getActiveInputFormat(text);
-  const rows = format === INPUT_FORMATS.markdown ? parseMarkdownTable(text) : parseCsv(text);
+  const normalizedText = normalizeEscapedNewlines(text);
+  const format = getActiveInputFormat(normalizedText);
+  const rows = format === INPUT_FORMATS.markdown ? parseMarkdownTable(normalizedText) : parseCsv(normalizedText);
   return { rows, format };
+}
+
+function normalizeEscapedNewlines(text) {
+  const source = String(text ?? '');
+  const hasRealNewline = /\r|\n/.test(source);
+  if (hasRealNewline || !source.includes('\\n')) return source;
+
+  return source.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\r/g, '\n');
 }
 
 function parseMarkdownStrong(text) {
@@ -303,7 +312,7 @@ function wrapStyledText(ctx, segments, maxWidth, fontSize) {
 
       const tokens = tokenizeText(paragraph).map((token) => ({ text: token, strong: !!segment.strong }));
       if (!tokens.length) {
-        if (pIdx < paragraphs.length - 1 || segIdx < src.length - 1) lines.push([]);
+        if (pIdx < paragraphs.length - 1) lines.push([]);
         return;
       }
 
@@ -339,7 +348,7 @@ function wrapStyledText(ctx, segments, maxWidth, fontSize) {
         }
       }
 
-      if (pIdx < paragraphs.length - 1 || segIdx < src.length - 1) lines.push([]);
+      if (pIdx < paragraphs.length - 1) lines.push([]);
     });
   });
 
