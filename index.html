@@ -3,16 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Cloudflare Pages などの静的ホスティングでそのまま動かせる、軽量な CSV / Markdown 表の PNG 変換ツール" />
     <title>CSV to PNG Table</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="app">
-      <h1>CSV → PNG テーブル変換</h1>
-      <p class="lead">CSVファイルまたは直接入力したCSVテキストを、設定付きでPNG化します。</p>
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Static / Lightweight / Cloudflare Ready</p>
+          <h1>CSV → PNG テーブル変換</h1>
+          <p class="lead">CSVファイルまたは直接入力したCSVテキストを、追加のサーバー処理なしで軽量にPNG化します。</p>
+        </div>
+        <p class="deploy-note">Cloudflare Pages 想定の静的構成です。HTML / CSS / JavaScriptのみで動作します。</p>
+      </header>
 
       <section class="panel input-panel">
-        <h2>1) CSV入力</h2>
+        <div class="panel-heading">
+          <h2>1) CSV入力</h2>
+          <p>ファイル読み込みと直接貼り付けのどちらにも対応しています。</p>
+        </div>
         <div class="input-grid">
           <div class="field full">
             <span>入力形式</span>
@@ -32,7 +42,7 @@
             <span>CSV / Markdownテキスト</span>
             <textarea
               id="csvText"
-              rows="10"
+              rows="12"
               placeholder="CSV例:\n項目,値,メモ\nA,100,テスト\n\nMarkdown表例:\n| 項目 | 値 | メモ |\n| --- | ---: | --- |\n| A | 100 | テスト |"
             ></textarea>
           </label>
@@ -40,7 +50,10 @@
       </section>
 
       <section class="panel settings-panel">
-        <h2>2) 出力設定</h2>
+        <div class="panel-heading">
+          <h2>2) 出力設定</h2>
+          <p>大きな構成変更は避けつつ、見た目だけを最小限に調整しています。</p>
+        </div>
         <div class="settings-grid">
           <label class="field">
             <span>アスペクト比</span>
@@ -122,7 +135,6 @@
             </select>
           </label>
 
-
           <label class="field checkbox">
             <input id="hasHeaderRow" type="checkbox" checked />
             <span>タイトル行あり</span>
@@ -151,8 +163,13 @@
       </section>
 
       <section class="panel preview">
-        <h2>3) プレビュー</h2>
-        <canvas id="previewCanvas" width="1920" height="1080" aria-label="table preview"></canvas>
+        <div class="panel-heading">
+          <h2>3) プレビュー</h2>
+          <p>スマホでは横スクロールで確認しやすくしています。</p>
+        </div>
+        <div class="preview-frame">
+          <canvas id="previewCanvas" width="1920" height="1080" aria-label="table preview"></canvas>
+        </div>
       </section>
     </main>
 
