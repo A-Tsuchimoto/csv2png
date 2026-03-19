@@ -48,6 +48,7 @@ const INPUT_FORMATS = {
 };
 
 let selectedInputFormat = INPUT_FORMATS.auto;
+let bodyRowHeightMode = 'auto';
 
 const COLOR_THEMES = {
   grayMist: {
@@ -125,6 +126,8 @@ const els = {
   bodyAlign: document.getElementById('bodyAlign'),
   tableStyle: document.getElementById('tableStyle'),
   colorTheme: document.getElementById('colorTheme'),
+  rowHeightAutoBtn: document.getElementById('rowHeightAutoBtn'),
+  rowHeightUniformBtn: document.getElementById('rowHeightUniformBtn'),
   renderBtn: document.getElementById('renderBtn'),
   downloadBtn: document.getElementById('downloadBtn'),
   canvas: document.getElementById('previewCanvas'),
@@ -396,6 +399,12 @@ function setFormatMode(mode) {
   els.formatHint.textContent = labelMap[mode];
 }
 
+function setBodyRowHeightMode(mode) {
+  bodyRowHeightMode = mode === 'uniform' ? 'uniform' : 'auto';
+  els.rowHeightAutoBtn.classList.toggle('active', bodyRowHeightMode === 'auto');
+  els.rowHeightUniformBtn.classList.toggle('active', bodyRowHeightMode === 'uniform');
+}
+
 function readRatio() {
   const [w, h] = els.aspectRatio.value.split(':').map(Number);
   return w / h;
@@ -414,10 +423,11 @@ function getFontSize(tableW, tableH, rowCount, colCount) {
   const value = els.fontSize.value;
   if (value !== 'auto') return Number(value);
 
+  const effectiveRows = Math.max(1, bodyRowHeightMode === 'uniform' ? rowCount + 0.6 : rowCount);
   const perCellW = tableW / Math.max(1, colCount);
-  const perCellH = tableH / Math.max(1, rowCount);
-  const fromWidth = Math.round(perCellW / 8.5);
-  const fromHeight = Math.round(perCellH * 0.38);
+  const perCellH = tableH / effectiveRows;
+  const fromWidth = Math.round(perCellW / (bodyRowHeightMode === 'uniform' ? 9.4 : 8.5));
+  const fromHeight = Math.round(perCellH * (bodyRowHeightMode === 'uniform' ? 0.34 : 0.38));
   return Math.max(10, Math.min(156, Math.min(fromWidth, fromHeight)));
 }
 
@@ -661,6 +671,17 @@ function render() {
       return maxLines * lineHeight + paddingY * 2;
     });
 
+    if (bodyRowHeightMode === 'uniform') {
+      const bodyStartRow = hasHeaderRow ? 1 : 0;
+      const bodyHeights = rowHeights.slice(bodyStartRow);
+      if (bodyHeights.length) {
+        const uniformBodyHeight = Math.max(...bodyHeights);
+        for (let i = bodyStartRow; i < rowHeights.length; i += 1) {
+          rowHeights[i] = uniformBodyHeight;
+        }
+      }
+    }
+
     const contentHeight = rowHeights.reduce((a, b) => a + b, 0);
     if (contentHeight <= tableH || fontSize <= 8) break;
     fontSize -= 1;
@@ -772,6 +793,14 @@ els.formatAutoBtn.addEventListener('click', () => {
   setFormatMode(INPUT_FORMATS.auto);
   render();
 });
+els.rowHeightAutoBtn.addEventListener('click', () => {
+  setBodyRowHeightMode('auto');
+  render();
+});
+els.rowHeightUniformBtn.addEventListener('click', () => {
+  setBodyRowHeightMode('uniform');
+  render();
+});
 els.formatCsvBtn.addEventListener('click', () => {
   setFormatMode(INPUT_FORMATS.csv);
   render();
@@ -806,4 +835,5 @@ CS,顧客満足度,4.6 / 5,前月比 +0.2,サポート品質アンケートで�
 運用,平均ページ表示時間,0.84秒,前月比 -0.11秒,Cloudflare配信を想定した軽量構成でも効果を確認
 総括,重点メモ,軽量性を最優先にしながらUIを最小限調整,対応済み,スマホでは縦積みレイアウトと横スクロール対応で閲覧性を確保`;
 setFormatMode(INPUT_FORMATS.auto);
+setBodyRowHeightMode('auto');
 render();
