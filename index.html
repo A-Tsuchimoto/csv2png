@@ -9,23 +9,31 @@
   </head>
   <body>
     <main class="app">
-      <header class="hero">
-        <div>
+      <header class="hero panel panel-hero">
+        <div class="hero-copy">
           <p class="eyebrow">Static / Lightweight / Cloudflare Ready</p>
           <h1>CSV → PNG テーブル変換</h1>
-          <p class="lead">CSVファイルまたは直接入力したCSVテキストを、追加のサーバー処理なしで軽量にPNG化します。</p>
+          <p class="lead">
+            CSV / Markdown の表を、そのまま PNG に変換。軽量さは保ちつつ、見た目と調整性を現代的に整えました。
+          </p>
         </div>
-        <p class="deploy-note">Cloudflare Pages 想定の静的構成です。HTML / CSS / JavaScriptのみで動作します。</p>
+        <div class="hero-note">
+          <strong>軽量な静的構成</strong>
+          <p>HTML / CSS / JavaScript のみで動作し、Cloudflare Pages などでもそのまま配信できます。</p>
+        </div>
       </header>
 
       <section class="panel input-panel">
         <div class="panel-heading">
-          <h2>1) CSV入力</h2>
-          <p>ファイル読み込みと直接貼り付けのどちらにも対応しています。</p>
+          <div>
+            <span class="panel-kicker">Input</span>
+            <h2>1) データ入力</h2>
+          </div>
+          <p>ファイルの読み込みと直接貼り付けの両方に対応しています。</p>
         </div>
         <div class="input-grid">
-          <div class="field full">
-            <span>入力形式</span>
+          <div class="field full field-card">
+            <span class="field-label">入力形式</span>
             <div class="format-controls" role="group" aria-label="入力形式の選択">
               <button id="formatAutoBtn" class="format-btn active" type="button">自動判定</button>
               <button id="formatCsvBtn" class="format-btn" type="button">CSV</button>
@@ -34,12 +42,12 @@
             <small id="formatHint" class="format-hint">現在: 自動判定</small>
           </div>
 
-          <label class="field">
-            <span>CSV / Markdownファイル</span>
+          <label class="field field-card">
+            <span class="field-label">CSV / Markdownファイル</span>
             <input id="csvFile" type="file" accept=".csv,.md,.txt,text/csv,text/markdown,text/plain" />
           </label>
-          <label class="field full">
-            <span>CSV / Markdownテキスト</span>
+          <label class="field full field-card">
+            <span class="field-label">CSV / Markdownテキスト</span>
             <textarea
               id="csvText"
               rows="12"
@@ -51,121 +59,161 @@
 
       <section class="panel settings-panel">
         <div class="panel-heading">
-          <h2>2) 出力設定</h2>
-          <p>大きな構成変更は避けつつ、見た目だけを最小限に調整しています。</p>
+          <div>
+            <span class="panel-kicker">Output</span>
+            <h2>2) 出力設定</h2>
+          </div>
+          <p>表の読みやすさを保ちながら、バランスよく見た目を調整できます。</p>
         </div>
-        <div class="settings-grid">
-          <label class="field">
-            <span>アスペクト比</span>
-            <select id="aspectRatio">
-              <option value="16:9" selected>16:9 (デフォルト)</option>
-              <option value="4:3">4:3</option>
-              <option value="1:1">1:1</option>
-              <option value="3:2">3:2</option>
-              <option value="21:9">21:9</option>
-            </select>
-          </label>
 
-          <label class="field">
-            <span>DPI</span>
-            <input id="dpi" type="number" min="72" max="2400" value="1200" />
-          </label>
+        <div class="settings-layout">
+          <div class="settings-group">
+            <div class="group-heading">
+              <h3>ベース設定</h3>
+              <p>サイズや描画の基本条件を決めます。</p>
+            </div>
+            <div class="settings-grid compact-grid">
+              <label class="field field-card">
+                <span class="field-label">アスペクト比</span>
+                <select id="aspectRatio">
+                  <option value="16:9" selected>16:9 (デフォルト)</option>
+                  <option value="4:3">4:3</option>
+                  <option value="1:1">1:1</option>
+                  <option value="3:2">3:2</option>
+                  <option value="21:9">21:9</option>
+                </select>
+              </label>
 
-          <label class="field">
-            <span>フォント</span>
-            <select id="fontFamily">
-              <option value="'Noto Sans JP', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif" selected>
-                Noto Sans JP (デフォルト)
-              </option>
-              <option value="'Yu Gothic', 'YuGothic', sans-serif">Yu Gothic</option>
-              <option value="'Meiryo', sans-serif">Meiryo</option>
-              <option value="'Arial', sans-serif">Arial</option>
-              <option value="'Times New Roman', serif">Times New Roman</option>
-            </select>
-          </label>
+              <label class="field field-card">
+                <span class="field-label">DPI</span>
+                <input id="dpi" type="number" min="72" max="2400" value="1200" />
+              </label>
 
-          <label class="field">
-            <span>フォントサイズ</span>
-            <select id="fontSize">
-              <option value="auto" selected>自動 (デフォルト)</option>
-              <option value="12">12px</option>
-              <option value="14">14px</option>
-              <option value="16">16px</option>
-              <option value="18">18px</option>
-              <option value="20">20px</option>
-              <option value="24">24px</option>
-              <option value="28">28px</option>
-              <option value="32">32px</option>
-              <option value="36">36px</option>
-              <option value="40">40px</option>
-              <option value="48">48px</option>
-              <option value="56">56px</option>
-              <option value="64">64px</option>
-              <option value="72">72px</option>
-              <option value="84">84px</option>
-              <option value="96">96px</option>
-              <option value="108">108px</option>
-              <option value="120">120px</option>
-              <option value="132">132px</option>
-              <option value="144">144px</option>
-              <option value="156">156px</option>
-            </select>
-          </label>
+              <label class="field field-card">
+                <span class="field-label">フォント</span>
+                <select id="fontFamily">
+                  <option value="'Noto Sans JP', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif" selected>
+                    Noto Sans JP (デフォルト)
+                  </option>
+                  <option value="'Yu Gothic', 'YuGothic', sans-serif">Yu Gothic</option>
+                  <option value="'Meiryo', sans-serif">Meiryo</option>
+                  <option value="'Arial', sans-serif">Arial</option>
+                  <option value="'Times New Roman', serif">Times New Roman</option>
+                </select>
+              </label>
 
-          <div class="field current-font" aria-live="polite">
-            <span>現在のフォントサイズ</span>
-            <output id="currentFontSize">-</output>
+              <label class="field field-card">
+                <span class="field-label">フォントサイズ</span>
+                <select id="fontSize">
+                  <option value="auto" selected>自動 (デフォルト)</option>
+                  <option value="12">12px</option>
+                  <option value="14">14px</option>
+                  <option value="16">16px</option>
+                  <option value="18">18px</option>
+                  <option value="20">20px</option>
+                  <option value="24">24px</option>
+                  <option value="28">28px</option>
+                  <option value="32">32px</option>
+                  <option value="36">36px</option>
+                  <option value="40">40px</option>
+                  <option value="48">48px</option>
+                  <option value="56">56px</option>
+                  <option value="64">64px</option>
+                  <option value="72">72px</option>
+                  <option value="84">84px</option>
+                  <option value="96">96px</option>
+                  <option value="108">108px</option>
+                  <option value="120">120px</option>
+                  <option value="132">132px</option>
+                  <option value="144">144px</option>
+                  <option value="156">156px</option>
+                </select>
+              </label>
+
+              <div class="field current-font field-card" aria-live="polite">
+                <span class="field-label">現在のフォントサイズ</span>
+                <output id="currentFontSize">-</output>
+              </div>
+            </div>
           </div>
 
-          <label class="field">
-            <span>タイトル行/列の揃え</span>
-            <select id="headerAlign">
-              <option value="center" selected>中央揃え (デフォルト)</option>
-              <option value="left">左揃え</option>
-              <option value="right">右揃え</option>
-            </select>
-          </label>
+          <div class="settings-group">
+            <div class="group-heading">
+              <h3>表の見た目</h3>
+              <p>揃えやデザイン、行の高さを切り替えます。</p>
+            </div>
+            <div class="settings-grid">
+              <label class="field field-card">
+                <span class="field-label">タイトル行/列の揃え</span>
+                <select id="headerAlign">
+                  <option value="center" selected>中央揃え (デフォルト)</option>
+                  <option value="left">左揃え</option>
+                  <option value="right">右揃え</option>
+                </select>
+              </label>
 
-          <label class="field">
-            <span>本文セルの揃え</span>
-            <select id="bodyAlign">
-              <option value="left" selected>左揃え (デフォルト)</option>
-              <option value="center">中央揃え</option>
-              <option value="right">右揃え</option>
-            </select>
-          </label>
+              <label class="field field-card">
+                <span class="field-label">本文セルの揃え</span>
+                <select id="bodyAlign">
+                  <option value="left" selected>左揃え (デフォルト)</option>
+                  <option value="center">中央揃え</option>
+                  <option value="right">右揃え</option>
+                </select>
+              </label>
 
-          <label class="field checkbox">
-            <input id="hasHeaderRow" type="checkbox" checked />
-            <span>タイトル行あり</span>
-          </label>
+              <div class="field field-card full">
+                <span class="field-label">本文行の高さ</span>
+                <div class="toggle-group" role="group" aria-label="本文行の高さの切り替え">
+                  <button id="rowHeightAutoBtn" class="toggle-btn active" type="button">内容に合わせる</button>
+                  <button id="rowHeightUniformBtn" class="toggle-btn" type="button">高さを揃える</button>
+                </div>
+                <small class="field-help">タイトル行は従来どおり個別計算し、本文行のみ均等化できます。</small>
+              </div>
 
-          <label class="field checkbox">
-            <input id="hasHeaderCol" type="checkbox" />
-            <span>タイトル列あり</span>
-          </label>
+              <label class="field checkbox-card">
+                <input id="hasHeaderRow" type="checkbox" checked />
+                <span>
+                  <strong>タイトル行あり</strong>
+                  <small>先頭行をヘッダーとして描画</small>
+                </span>
+              </label>
 
-          <label class="field">
-            <span>表のデザイン</span>
-            <select id="tableStyle"></select>
-          </label>
+              <label class="field checkbox-card">
+                <input id="hasHeaderCol" type="checkbox" />
+                <span>
+                  <strong>タイトル列あり</strong>
+                  <small>先頭列をヘッダー扱いにする</small>
+                </span>
+              </label>
 
-          <label class="field">
-            <span>色パターン</span>
-            <select id="colorTheme"></select>
-          </label>
+              <label class="field field-card">
+                <span class="field-label">表のデザイン</span>
+                <select id="tableStyle"></select>
+              </label>
+
+              <label class="field field-card">
+                <span class="field-label">色パターン</span>
+                <select id="colorTheme"></select>
+              </label>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="panel actions">
-        <button id="renderBtn" type="button">プレビュー更新</button>
-        <button id="downloadBtn" type="button">PNGをダウンロード</button>
+      <section class="panel action-bar">
+        <div class="actions">
+          <button id="renderBtn" type="button">プレビュー更新</button>
+          <button id="downloadBtn" type="button">PNGをダウンロード</button>
+        </div>
       </section>
 
       <section class="panel preview">
         <div class="panel-heading">
-          <h2>3) プレビュー</h2>
-          <p>スマホでは横スクロールで確認しやすくしています。</p>
+          <div>
+            <span class="panel-kicker">Preview</span>
+            <h2>3) プレビュー</h2>
+          </div>
+          <p>狭い画面では横スクロールで確認できます。</p>
         </div>
         <div class="preview-frame">
           <canvas id="previewCanvas" width="1920" height="1080" aria-label="table preview"></canvas>
