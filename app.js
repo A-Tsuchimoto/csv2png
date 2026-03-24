@@ -120,6 +120,8 @@ const els = {
   fontFamily: document.getElementById('fontFamily'),
   fontSize: document.getElementById('fontSize'),
   currentFontSize: document.getElementById('currentFontSize'),
+  tableTitle: document.getElementById('tableTitle'),
+  titleFontSize: document.getElementById('titleFontSize'),
   hasHeaderRow: document.getElementById('hasHeaderRow'),
   hasHeaderCol: document.getElementById('hasHeaderCol'),
   headerAlign: document.getElementById('headerAlign'),
@@ -436,6 +438,14 @@ function updateCurrentFontSizeLabel(fontSize) {
   els.currentFontSize.textContent = `${fontSize}px (${modeLabel})`;
 }
 
+function getTitleFontSize(baseWidth, baseHeight, tableFontSize) {
+  const value = els.titleFontSize.value;
+  if (value !== 'auto') return Number(value);
+
+  const scaleByCanvas = Math.round(Math.min(baseWidth, baseHeight) * 0.03);
+  return Math.max(16, Math.min(96, Math.max(scaleByCanvas, tableFontSize + 8)));
+}
+
 function tokenizeText(text) {
   if (!text) return [];
 
@@ -599,28 +609,18 @@ function render() {
   const theme = COLOR_THEMES[els.colorTheme.value];
   const hasHeaderRow = els.hasHeaderRow.checked;
   const hasHeaderCol = els.hasHeaderCol.checked;
+  const titleText = els.tableTitle.value.trim();
+  const hasTitle = titleText.length > 0;
 
-  const { width, height } = calcCanvasSize();
-  els.canvas.width = width;
-  els.canvas.height = height;
+  const { width: baseWidth, height: baseHeight } = calcCanvasSize();
+  els.canvas.width = baseWidth;
+  els.canvas.height = baseHeight;
+  let ctx = els.canvas.getContext('2d');
 
-  const ctx = els.canvas.getContext('2d');
-  ctx.fillStyle = theme.bg;
-  ctx.fillRect(0, 0, width, height);
-
-  const margin = Math.round(Math.min(width, height) * 0.025);
+  const margin = Math.round(Math.min(baseWidth, baseHeight) * 0.025);
   const tableX = margin;
-  const tableY = margin;
-  const tableW = width - margin * 2;
-  const tableH = height - margin * 2;
-
-  if (style.shadow) {
-    ctx.save();
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.12)';
-    roundRect(ctx, tableX + 8, tableY + 10, tableW, tableH, 14);
-    ctx.fill();
-    ctx.restore();
-  }
+  const tableW = baseWidth - margin * 2;
+  const tableH = baseHeight - margin * 2;
 
   const rowCount = rows.length;
   const colCount = rows[0].length;
@@ -687,6 +687,39 @@ function render() {
     fontSize -= 1;
   } while (true);
 
+  const titleFontSize = getTitleFontSize(baseWidth, baseHeight, fontSize);
+  const titlePaddingY = Math.max(10, Math.round(titleFontSize * 0.35));
+  const titleBlockHeight = hasTitle ? titleFontSize + titlePaddingY * 2 : 0;
+  const finalHeight = baseHeight + titleBlockHeight;
+
+  if (finalHeight !== els.canvas.height) {
+    els.canvas.width = baseWidth;
+    els.canvas.height = finalHeight;
+    ctx = els.canvas.getContext('2d');
+  }
+
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(0, 0, baseWidth, finalHeight);
+
+  if (hasTitle) {
+    ctx.font = `600 ${titleFontSize}px ${els.fontFamily.value}`;
+    ctx.fillStyle = theme.text;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(titleText, baseWidth / 2, titleBlockHeight / 2);
+  }
+
+  const tableY = margin + titleBlockHeight;
+
+  if (style.shadow) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.12)';
+    roundRect(ctx, tableX + 8, tableY + 10, tableW, tableH, 14);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 
   let y = tableY;
@@ -812,6 +845,8 @@ els.formatMdBtn.addEventListener('click', () => {
 els.csvText.addEventListener('input', () => {
   if (selectedInputFormat === INPUT_FORMATS.auto) setFormatMode(INPUT_FORMATS.auto);
 });
+els.tableTitle.addEventListener('input', render);
+els.titleFontSize.addEventListener('change', render);
 
 els.renderBtn.addEventListener('click', render);
 els.downloadBtn.addEventListener('click', downloadPng);
